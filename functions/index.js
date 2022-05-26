@@ -24,10 +24,26 @@ admin.initializeApp();
 //         return snap.ref.set({ upperCase }, { merge: true });
 //     })
 
+
 exports.myMessages = functions.firestore.document('/messages/{documentId}')
-.onCreate((snap, context) => {
+    .onCreate(async (snap, context) => {
     const newVal = snap.data()
-    return functions.logger.log('New Message >>>', context.params.documentId, newVal.contact)
+    const tokensList = newVal.people.map(item => item.tokenId);
+    const payload = {
+        notification: {
+            title: 'First Aid',
+            body: 'Your friend is in danger !'
+        }
+    }
+    const response = await admin.messaging().sendToDevice(tokensList, payload)
+    response.results.forEach((result, index) => {
+        const error = result.error
+        if (error) {
+            functions.logger.log('Failed to send notification to', tokensList[index], error)
+        }
+    })
+
+    return functions.logger.log('Message sent successfully', context.params.documentId, newVal.firstname)
 
     //push notifications
     //admin.messaging()
@@ -41,20 +57,3 @@ exports.onUserUpdates = functions.firestore.document('/users/{userId}')
 
     //push notifications
 });
-
-exports.onUserSubCollectionChanges = functions.firestore.document('/users/{userId}/{activityCollectionId}/{activityId}')
-.onUpdate((change, context) => {
-    const newVal = change.after.data();
-    const oldVal = change.before.data();
-    return functions.logger.log('activity new name', context.params.userId, newVal.name)
-
-    //push notifications
-});
-
-
-exports.onDeleteUser = functions.firestore.document('/users/{userId}')
-.onDelete((snap, context) => {
-    const deletedData = snap.data();
-    return functions.logger.log('A user was deleted !!', context.params.userId, deletedData.firstname)
-
-})
